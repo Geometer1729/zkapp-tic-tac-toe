@@ -7,28 +7,51 @@
       pkgs = import nixpkgs
       { system = "x86_64-linux"; };
       #lib = pkgs.lib;
-      zkapp-cli = pkgs.buildNpmPackage {
-        pname = "zkapp-cli";
-        version = "v0.21.3";
-        src = pkgs.fetchFromGitHub {
-          owner = "o1-labs";
-          repo = "zkapp-cli";
-          rev = "v0.21.3";
-          hash = "sha256-QlT7C54PXb7BHBXU9FkoT1PBaO10StQLCxHJFUrPKIA=";
+      o1js =
+        let
+          version = "1.3.0";
+        in
+        pkgs.buildNpmPackage
+        {
+          pname = "01js";
+          inherit version;
+          src = pkgs.fetchFromGitHub {
+            owner = "o1-labs";
+            repo = "o1js";
+            rev = "v${version}";
+            hash = "sha256-zeoFT2mVGItn7p/72WKbBhfuig/uinc6e0Xqg8dVET4=";
+          };
+          npmDepsHash = "sha256-m+h1gbthPBpifOSPFyX0IzgG4gr8vhq025uNDMijZns=";
+          #npmInstallFlags = [ "--ignore-scripts" ];
+          dontNpmBuild = true;
         };
-        npmDepsHash = "sha256-FRD7gOGU8n228FW1UgNFvMMcZAITeLkwwZPg0bFQjpc=";
-        npmInstallFlags = [ "--ignore-scripts" ];
-        dontNpmBuild = true;
-      };
+      zkapp-cli =
+        let
+          version = "0.21.3";
+        in
+        pkgs.buildNpmPackage
+        {
+          pname = "zkapp-cli";
+          inherit version;
+          src = pkgs.fetchFromGitHub {
+            owner = "o1-labs";
+            repo = "zkapp-cli";
+            rev = "v${version}";
+            hash = "sha256-QlT7C54PXb7BHBXU9FkoT1PBaO10StQLCxHJFUrPKIA=";
+          };
+          npmDepsHash = "sha256-FRD7gOGU8n228FW1UgNFvMMcZAITeLkwwZPg0bFQjpc=";
+          #npmInstallFlags = [ "--ignore-scripts" ];
+          dontNpmBuild = true;
+        };
       app = pkgs.buildNpmPackage {
         pname = "my-test-app";
         version = "0";
         src = ./.;
-        npmDepsHash = "sha256-S8wDY+ZL3QvW83KcXn45BEMe5DQUgoTssM8UwcByqBU=";
+        npmDepsHash = "sha256-xrBML1MXM4KEMyomSUNkqzPksUY0kvnbCEZX5G2uBDM=";
       };
   in
   {
-      devShell.x86_64-linux = pkgs.mkShell
+      devShells.x86_64-linux.default = pkgs.mkShell
         {
           inputsFrom = [ app ];
           packages = with pkgs;
@@ -36,8 +59,11 @@
               nodePackages.npm
               app
               zkapp-cli
+              o1js
+              typescript
+              nodePackages.typescript-language-server
             ];
         };
-      defaultPackage.x86_64-linux = app;
+      packages.x86_64-linux.default = app;
   };
 }
