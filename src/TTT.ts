@@ -1,9 +1,18 @@
 import { Field, SmartContract, state, State, method, Gadgets, Bool, assert } from 'o1js';
 
+let row = 0b111;
+let col = 0b1001001;
+let win_numbers =
+  [ Field(row) , Field(row << 3) , Field(row << 6)
+  , Field(col) , Field(col << 1) , Field(col << 2)
+  , Field(0b100010001) , Field(0b001010100) // Diagonals
+  ]
+
 export class TTT extends SmartContract {
   @state(Field) xs = State<Field>();
   @state(Field) os = State<Field>();
   @state(Bool) turn = State<Bool>();
+  @state(Bool) won = State<Bool>();
   // True when it's x's turn
 
   init() {
@@ -13,9 +22,8 @@ export class TTT extends SmartContract {
     this.turn.set(Bool(true));
   }
 
-  // True is xs
-  // expected_turn is a debug variable
-  @method async move(move : Field) {
+  // winClaim of 0 to not claim a win
+  @method async move(move : Field, winClaim : Field) {
     // TODO track the player for each side and require a signature?
     // also sync with the chain less
 
@@ -53,5 +61,12 @@ export class TTT extends SmartContract {
     let osNew = os.add(nextTurn.mul(move));
     this.xs.set(xsNew);
     this.os.set(osNew);
+
+
+    let validWinNumber = win_numbers.map(n => winClaim.equals(n)).reduce((a,b) => a.or(b),Bool(false));
+    let winnerBoard = xsNew.mul(turn).add(osNew.mul(nextTurn));
+    let boardSupportsWin = Gadgets.and(winnerBoard,winClaim,9).equals(winClaim);
+    assert((validWinNumber.and(boardSupportsWin)).or(winClaim.equals(0)));
+    this.won.set(winClaim.equals(0).not())
   }
 }

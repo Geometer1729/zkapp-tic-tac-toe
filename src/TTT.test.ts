@@ -33,6 +33,7 @@ describe('TTT', () => {
     zkAppPrivateKey = PrivateKey.random();
     zkAppAddress = zkAppPrivateKey.toPublicKey();
     zkApp = new TTT(zkAppAddress);
+
   });
 
   async function localDeploy() {
@@ -43,6 +44,13 @@ describe('TTT', () => {
     await txn.prove();
     // this tx needs .sign(), because `deploy()` adds an account update that requires signature authorization
     await txn.sign([deployerKey, zkAppPrivateKey]).send();
+  }
+  async function doMove(move : number,claimWin : number) {
+    const txn = await Mina.transaction(senderAccount, async () => {
+      await zkApp.move(Field(move),Field(claimWin));
+    });
+    await txn.prove();
+    await txn.sign([senderKey]).send();
   }
 
   it('generates and deploys the `TTT` smart contract', async () => {
@@ -60,7 +68,7 @@ describe('TTT', () => {
 
     // update transaction
     const txn = await Mina.transaction(senderAccount, async () => {
-      await zkApp.move(Field(1));
+      await zkApp.move(Field(1),Field(0));
     });
     await txn.prove();
     await txn.sign([senderKey]).send();
@@ -73,7 +81,7 @@ describe('TTT', () => {
     expect(turn).toEqual(Bool(false));
 
     const txn2 = await Mina.transaction(senderAccount, async () => {
-      await zkApp.move(Field(4));
+      await zkApp.move(Field(4),Field(0));
     });
     await txn2.prove();
     await txn2.sign([senderKey]).send();
@@ -85,4 +93,32 @@ describe('TTT', () => {
     const turn_2 = zkApp.turn.get();
     expect(turn_2).toEqual(Bool(true));
   });
+
+  it('correctly claims a win', async () => {
+    await localDeploy();
+    await doMove(1,0);
+    await doMove(8,0);
+    await doMove(2,0);
+    await doMove(16,0);
+    await doMove(4,7);
+
+  });
+
+  it('bad win claim fails', async () => {
+    await localDeploy();
+    await doMove(1,0);
+    await doMove(8,0);
+    await doMove(2,0);
+    expect(doMove(16,18))
+      .rejects
+      .toThrowError()
+  });
+
+  it('non-power of 2 move rejected', async () => {
+    await localDeploy();
+    expect(doMove(3,0))
+      .rejects
+      .toThrowError()
+  });
 })
+
