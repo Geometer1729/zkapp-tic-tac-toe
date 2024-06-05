@@ -22,8 +22,24 @@ export class TTT extends SmartContract {
     this.turn.set(Bool(true));
   }
 
+  async move(move : number) {
+    let move_val = Field(1 << move);
+    let win = Field(0);
+    for(let n of win_numbers){
+      if(this.turn.get().toBoolean()) {
+        if(Gadgets.and(this.xs.get().add(move_val),n,9).equals(n).toBoolean()) {
+          win = n;
+        }
+      } else {
+        if(Gadgets.and(this.os.get().add(move_val),n,9).equals(n).toBoolean()) {
+          win = n;
+        }
+      }
+    }
+    return ( async () => { await this.moveRaw(move_val,win); })
+  }
   // winClaim of 0 to not claim a win
-  @method async move(move : Field, winClaim : Field) {
+  @method async moveRaw(move : Field, winClaim : Field) {
     // TODO track the player for each side and require a signature?
     // also sync with the chain less
 
@@ -33,7 +49,7 @@ export class TTT extends SmartContract {
     // and computing the power of 2
 
     move.assertNotEquals(0);
-    assert(move.lessThanOrEqual(2 << 9));
+    assert(move.lessThanOrEqual(1 << 9));
     // Check for ones distance one appart
     const move_l1 = Gadgets.leftShift32(move,1);
     assert(Gadgets.and(move_l1,move,10).equals(0));

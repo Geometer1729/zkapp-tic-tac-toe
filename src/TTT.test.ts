@@ -45,10 +45,17 @@ describe('TTT', () => {
     // this tx needs .sign(), because `deploy()` adds an account update that requires signature authorization
     await txn.sign([deployerKey, zkAppPrivateKey]).send();
   }
-  async function doMove(move : number,claimWin : number) {
+
+  async function doMoveRaw(move : number,claimWin : number) {
     const txn = await Mina.transaction(senderAccount, async () => {
-      await zkApp.move(Field(move),Field(claimWin));
+      await zkApp.moveRaw(Field(move),Field(claimWin));
     });
+    await txn.prove();
+    await txn.sign([senderKey]).send();
+  }
+
+  async function doMove(move : number) {
+    const txn = await Mina.transaction(senderAccount,await zkApp.move(move));
     await txn.prove();
     await txn.sign([senderKey]).send();
   }
@@ -63,62 +70,83 @@ describe('TTT', () => {
     expect(turn).toEqual(Bool(true));
   });
 
-  it('correctly updates the num state on the `TTT` smart contract', async () => {
+  it('Play a couple moves and onchain data looks correct', async () => {
     await localDeploy();
 
-    // update transaction
-    const txn = await Mina.transaction(senderAccount, async () => {
-      await zkApp.move(Field(1),Field(0));
-    });
-    await txn.prove();
-    await txn.sign([senderKey]).send();
+    expect(zkApp.xs.get()).toEqual(Field(0));
+    expect(zkApp.os.get()).toEqual(Field(0));
+    expect(zkApp.turn.get()).toEqual(Bool(true));
+    expect(zkApp.won.get()).toEqual(Bool(false));
 
-    const xs = zkApp.xs.get();
-    expect(xs).toEqual(Field(1));
-    const os = zkApp.os.get();
-    expect(os).toEqual(Field(0));
-    const turn = zkApp.turn.get();
-    expect(turn).toEqual(Bool(false));
+    await doMove(0)
 
-    const txn2 = await Mina.transaction(senderAccount, async () => {
-      await zkApp.move(Field(4),Field(0));
-    });
-    await txn2.prove();
-    await txn2.sign([senderKey]).send();
+    expect(zkApp.xs.get()).toEqual(Field(1 << 0));
+    expect(zkApp.os.get()).toEqual(Field(0));
+    expect(zkApp.turn.get()).toEqual(Bool(false));
+    expect(zkApp.won.get()).toEqual(Bool(false));
 
-    const xs_2 = zkApp.xs.get();
-    expect(xs_2).toEqual(Field(1));
-    const os_2 = zkApp.os.get();
-    expect(os_2).toEqual(Field(4));
-    const turn_2 = zkApp.turn.get();
-    expect(turn_2).toEqual(Bool(true));
+    await doMove(2)
+
+    expect(zkApp.xs.get()).toEqual(Field(1 << 0));
+    expect(zkApp.os.get()).toEqual(Field(1 << 2));
+    expect(zkApp.turn.get()).toEqual(Bool(true));
+    expect(zkApp.won.get()).toEqual(Bool(false));
+
   });
 
   it('correctly claims a win', async () => {
     await localDeploy();
-    await doMove(1,0);
-    await doMove(8,0);
-    await doMove(2,0);
-    await doMove(16,0);
-    await doMove(4,7);
+    await doMove(0);
+    await doMove(5);
+    await doMove(1);
+    await doMove(8);
+    await doMove(2);
+    expect(zkApp.won.get()).toEqual(Bool(true));
+
+  });
+
+  it('correctly claims a diagonal win', async () => {
+    await localDeploy();
+    await doMove(0);
+    await doMove(2);
+    await doMove(4);
+    await doMove(6);
+    await doMove(8);
+    expect(zkApp.won.get()).toEqual(Bool(true));
+
+  });
+
+  it('correctly claims a win as o', async () => {
+    await localDeploy();
+    await doMove(0);
+    await doMove(3);
+    await doMove(1);
+    await doMove(4);
+    await doMove(8);
+    await doMove(5);
+    expect(zkApp.won.get()).toEqual(Bool(true));
 
   });
 
   it('bad win claim fails', async () => {
     await localDeploy();
-    await doMove(1,0);
-    await doMove(8,0);
-    await doMove(2,0);
-    expect(doMove(16,18))
+    await doMove(0);
+    await doMove(3);
+    await doMove(1);
+    expect(doMoveRaw(1 << 4,18))
       .rejects
       .toThrowError()
   });
 
-  it('non-power of 2 move rejected', async () => {
+  it('non-power of 2 moves rejected', async () => {
     await localDeploy();
-    expect(doMove(3,0))
-      .rejects
-      .toThrowError()
+    for (let i=0; i <= 1<<9 ; i++) {
+      if (![1,2,4,8,16,32,64,128,256,512].includes(i)) {
+        await expect(doMoveRaw(i,0))
+          .rejects
+          .toThrowError()
+      }
+    }
   });
 })
 
