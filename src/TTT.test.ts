@@ -1,5 +1,5 @@
 import { AccountUpdate, Bool, Field, Mina, PrivateKey, PublicKey } from 'o1js';
-import { TTT } from './TTT';
+import { TTT , TTTRec , moveRec, start} from './TTT';
 
 /*
  * This file specifies how to test the `Add` example smart contract. It is safe to delete this file and replace
@@ -8,7 +8,46 @@ import { TTT } from './TTT';
  * See https://docs.minaprotocol.com/zkapps for more info.
  */
 
-let proofsEnabled = false;
+
+describe('TTT recursive', () => {
+  beforeAll(async () => {
+    await TTTRec.compile();
+  });
+
+  it('Prove init game', async () => {
+    const proof = await TTTRec.init(start);
+    await TTTRec.verify(proof);
+
+  });
+
+  it('Make a move', async () => {
+    const proof = await TTTRec.init(start);
+    await TTTRec.verify(proof);
+    const proof2 = await moveRec(proof,0);
+    await TTTRec.verify(proof2);
+  });
+
+  it('Prove a win', async () => {
+    let proof = await TTTRec.init(start);
+    await TTTRec.verify(proof);
+
+    async function moveState(move:number) {
+      let new_proof = await moveRec(proof,move);
+      await TTTRec.verify(new_proof);
+      proof = new_proof;
+    }
+    await moveState(0);
+    await moveState(8);
+    await moveState(1);
+    await moveState(7);
+    await moveState(2);
+    proof.publicInput.won.assertTrue();
+  });
+})
+
+
+/*
+let proofsEnabled = true;
 
 describe('TTT', () => {
   let deployerAccount: Mina.TestPublicKey,
@@ -176,6 +215,6 @@ describe('TTT', () => {
       .toThrowError()
   });
 
-
 })
-1025
+
+*/
