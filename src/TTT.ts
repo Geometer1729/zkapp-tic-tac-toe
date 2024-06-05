@@ -1,18 +1,12 @@
 import { Field, SmartContract, state, State, method, Gadgets, Bool, assert } from 'o1js';
 
-let row = 0b111;
-let col = 0b1001001;
-let win_numbers =
-  [ Field(row) , Field(row << 3) , Field(row << 6)
-  , Field(col) , Field(col << 1) , Field(col << 2)
-  , Field(0b100010001) , Field(0b001010100) // Diagonals
-  ]
 
 export class TTT extends SmartContract {
   @state(Field) xs = State<Field>();
   @state(Field) os = State<Field>();
   @state(Bool) turn = State<Bool>();
   @state(Bool) won = State<Bool>();
+  @state(Bool) drawn = State<Bool>();
   // True when it's x's turn
 
   init() {
@@ -20,6 +14,8 @@ export class TTT extends SmartContract {
     this.xs.set(Field.from(0));
     this.os.set(Field.from(0));
     this.turn.set(Bool(true));
+    this.won.set(Bool(false));
+    this.drawn.set(Bool(false));
   }
 
   async move(move : number) {
@@ -44,10 +40,12 @@ export class TTT extends SmartContract {
     // also sync with the chain less
 
     // AFAICT it's not easy to do 2^n in a proof?
+    // when n is only known at runtime
     // so I'll require the user compute it and
     // check that move is a power of 2 instead of taking the index
     // and computing the power of 2
 
+    this.won.getAndRequireEquals().assertFalse()
     move.assertNotEquals(0);
     assert(move.lessThanOrEqual(1 << 9));
     // Check for ones distance one appart
@@ -78,11 +76,20 @@ export class TTT extends SmartContract {
     this.xs.set(xsNew);
     this.os.set(osNew);
 
-
     let validWinNumber = win_numbers.map(n => winClaim.equals(n)).reduce((a,b) => a.or(b),Bool(false));
     let winnerBoard = xsNew.mul(turn).add(osNew.mul(nextTurn));
     let boardSupportsWin = Gadgets.and(winnerBoard,winClaim,9).equals(winClaim);
     assert((validWinNumber.and(boardSupportsWin)).or(winClaim.equals(0)));
-    this.won.set(winClaim.equals(0).not())
+    const newWon = winClaim.equals(0).not();
+    this.won.set(newWon);
+    this.drawn.set(xsNew.add(osNew).equals(0b111111111).and(newWon.not()));
   }
 }
+
+const row = 0b111;
+const col = 0b1001001;
+const win_numbers =
+  [ Field(row) , Field(row << 3) , Field(row << 6)
+  , Field(col) , Field(col << 1) , Field(col << 2)
+  , Field(0b100010001) , Field(0b001010100) // Diagonals
+  ]

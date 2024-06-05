@@ -148,5 +148,34 @@ describe('TTT', () => {
       }
     }
   });
-})
 
+  it('draws are detected', async () => {
+    await localDeploy();
+    await doMove(0);
+    await doMove(4);
+    await doMove(8);
+    await doMove(1);
+    await doMove(7);
+    await doMove(6);
+    await doMove(2);
+    await doMove(5);
+    await doMove(3);
+    expect(zkApp.won.get()).toEqual(Bool(false));
+    expect(zkApp.drawn.get()).toEqual(Bool(true));
+  });
+
+  it('Can\'t play after loss', async () => {
+    await localDeploy();
+    await doMove(0);
+    await doMove(8);
+    await doMove(1);
+    await doMove(7);
+    await doMove(2);
+    await expect(doMove(6))
+      .rejects
+      .toThrowError()
+  });
+
+
+})
+1025
